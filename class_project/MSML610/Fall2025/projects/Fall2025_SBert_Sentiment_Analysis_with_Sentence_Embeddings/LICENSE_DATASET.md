@@ -1,0 +1,1 @@
+This project uses the Financial PhraseBank dataset (Malo et al., 2014). Source: Kaggle mirror (https://www.kaggle.com/datasets/ankurzing/sentiment-analysis-for-financial-news). The dataset requires manual download from Kaggle and must not be committed to this repository.

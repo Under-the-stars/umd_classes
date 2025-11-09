@@ -1,0 +1,17 @@
+dataset:
+  name: FinancialPhraseBank
+  url: https://www.kaggle.com/datasets/ankurzing/sentiment-analysis-for-financial-news
+  local_raw_dir: data/raw
+  local_processed_dir: data/processed
+processing:
+  text_column: sentence
+  label_column: sentiment
+  label_map: {positive: 2, neutral: 1, negative: 0}
+embeddings:
+  model: sentence-transformers/all-MiniLM-L6-v2
+  batch_size: 64
+  device: auto
+outputs:
+  processed_csv: data/processed/financial_phrasebank_clean.csv
+  embeddings_npy: data/processed/sbert_embeddings.npy
+  labels_npy: data/processed/labels.npy

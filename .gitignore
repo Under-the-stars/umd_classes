@@ -1,0 +1,15 @@
+
+# macOS + temp
+.DS_Store
+tmp.*
+*.log
+dev_scripts_umd_classes/thin_client/tmp.*
+class_project/instructions/tutorial_template/tmp.build/
+
+
+# keep data local
+**/data/raw/*
+**/data/processed/*
+*.npy
+*.csv
+.ipynb_checkpoints/
