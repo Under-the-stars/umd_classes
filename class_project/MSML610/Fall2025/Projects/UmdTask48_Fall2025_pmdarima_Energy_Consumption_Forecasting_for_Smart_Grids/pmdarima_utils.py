@@ -10,6 +10,9 @@ Energy Consumption Forecasting using PMDARIMA project.
   model setup, evaluation, or any reusable logic.
 """
 
+import os
+import urllib.request
+import zipfile
 import logging
 
 import numpy as np
@@ -26,19 +29,32 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 # Example 1: Load and preprocess the dataset
 # -----------------------------------------------------------------------------
-
-
-def load_energy_data(path: str) -> pd.DataFrame:
+def load_energy_data(path: str = "data/household_power_consumption.txt") -> pd.DataFrame:
     """
     Load and preprocess the UCI Individual Household Electric Power Consumption dataset.
-
+        Automatically downloads the dataset if not found locally.
     - Combines 'Date' and 'Time' columns into a single datetime index.
     - Converts missing values ('?') to NaN and drops invalid rows.
     - Resamples the target variable to hourly frequency for forecasting.
 
-    :param path: Path to the dataset (.csv or .txt)
+    :param path: Path to the dataset (.txt)
     :return: Cleaned and hourly-resampled DataFrame containing 'Global_active_power'
     """
+    # Auto-download if file missing
+    if not os.path.exists(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        url = (
+             "https://archive.ics.uci.edu/ml/machine-learning-databases/00235/household_power_consumption.zip"
+        )
+        zip_path = os.path.join(os.path.dirname(path), "household_power_consumption.zip")
+        logger.info("Dataset not found locally. Downloading from UCI...")
+        urllib.request.urlretrieve(url, zip_path)
+
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(os.path.dirname(path))
+        os.remove(zip_path)
+        logger.info("Dataset successfully downloaded and extracted to %s", path)
+
     logger.info("Loading dataset from %s", path)
 
     # Reading dataset
