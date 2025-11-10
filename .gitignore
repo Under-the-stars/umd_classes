@@ -1,1 +1,6 @@
-class_project/MSML610/Fall2025/Projects/UmdTask17_Fall2025_DGL_Movie_Recommendation_System/data/
+**/__pycache__/
+**/.ipynb_checkpoints/
+
+# Specific folders to ignore (like from your project)
+**/data/
+**/helpers_root/
