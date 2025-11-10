@@ -1,0 +1,9 @@
+nevergrad
+yfinance
+pandas
+numpy
+matplotlib
+curl_cffi
+ipykernel
+seaborn
+statsmodels
