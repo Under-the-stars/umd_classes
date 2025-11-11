@@ -1,12 +1,10 @@
-Folder for MSML610 Fall 2025 Project related files
-# Project Info:
-Title: Anomaly Detection in Network Traffic
-Author: Marie Vetluzhskikh, UID: 120143991
-Project Difficulty: Level 3 (Hard)
+# TO DO: 
+- (Document the native programming interface &#40;classes, functions, configuration objects&#41; of your chosen tool or library.)
+- (Describe the lightweight wrapper layer you have written on top of this native API.)
 
-# Description
+-----
 
-HMMlearn is a Python library designed for Hidden Markov Models (HMM), which are statistical models that assume an underlying process generating observable events is a Markov process with unobserved (hidden) states. It is particularly useful for sequential data analysis and time-series prediction. 
+HMMlearn is a Python library designed for Hidden Markov Models &#40;HMM&#41;, which are statistical models that assume an underlying process generating observable events is a Markov process with unobserved &#40;hidden&#41; states. It is particularly useful for sequential data analysis and time-series prediction. 
 
 Technologies Used
 HMMlearn
@@ -15,10 +13,6 @@ HMMlearn
 - Supports training, evaluation, and prediction on sequences of data.
 - Offers functionality for model fitting and state inference.
 
----
-
-
-### Project 3: Anomaly Detection in Network Traffic (Difficulty: 3 - Hard)
 
 **Project Objective**: Build an anomaly detection system for network traffic data using a Hidden Markov Model. The aim is to identify unusual patterns that may indicate security threats or breaches.
 
@@ -49,4 +43,6 @@ HMMlearn
 
 **Bonus Ideas (Optional)**: 
 - For Project 3, implement a feedback loop that retrains the model based on new traffic data to improve accuracy over time.
+
+
 
