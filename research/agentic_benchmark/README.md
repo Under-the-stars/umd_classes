@@ -1,200 +1,108 @@
-# Benchmarking Agentic Reasoning for Data Science
-### DATA605 Spring 2026 | University of Maryland
-### Author: Shobha Gupta | Issue #435
+# Agentic Benchmark: Fair Comparison and Full Study
 
----
+Author: Shobha Gupta | DATA605 Spring 2026 | Issue #435
 
-## What Is This Project? (For Non-Technical Readers)
+## Question
 
-Imagine you hire three different assistants to analyze medical data and predict heart disease.
+Does a multi-agent LangGraph pipeline with a Reviewer node produce more reliable results than a single-pass pipeline and AutoGluon, especially when the data is corrupted?
 
-- **Assistant 1 (Single Agent — like ChatGPT):** Reads the data once, builds a model, gives you the answer. Done. No second opinions.
-- **Assistant 2 (AutoGluon):** Tries every possible mathematical approach automatically and picks the best one. Fast but blind to obvious mistakes.
-- **Assistant 3 (This Project — LangGraph):** Has a team of 5 specialists who work in a loop. If one specialist makes a mistake, a reviewer catches it and sends the work back for correction.
+## Short answer
 
-This project builds Assistant 3 and proves it produces more reliable, robust results — especially when the data is messy or corrupted.
+The Reviewer does not improve accuracy. It does make the pipeline safer. It finds every injected impossible value, and it flagged an injected leaked feature in 10 of 10 runs, where the systems without it scored a false MCC of 1.0. On clean data the fixed Reviewer matches the no-reviewer score on Heart Disease and Amazon. On NYC Taxi it scores lower on MCC.
 
----
+## Why this folder exists
 
-## The Problem With Single-Pass AI Systems
+My first results said LangGraph won. When I audited them, the comparison was not fair: the systems used different models and different splits, the corruption had no random seed, the test set was tiny, and models were chosen by F1, which rewards predicting everyone as positive. I rebuilt the benchmark so every system is tested the same way. Claims from the first version (for example "only LangGraph detected leakage" and "+16.6% under noise") are not supported and should be ignored.
 
-When ChatGPT or similar tools analyze data, they do it once and report whatever result they get. If the data has problems — corrupt values, misleading features, class imbalance — the system reports wrong results with full confidence.
+## Setup
 
-**Real example from this project:**
-When analyzing NYC Taxi data, a naive system reported 94% accuracy. Sounds great. But our system's Quality Reviewer noticed that one feature (`payment_type`) was directly leaking the answer — cash riders never tip, card riders almost always do. Remove that feature and accuracy drops to 56%. The single-pass system never caught this. Ours did.
+- Systems: always positive (baseline), single agent, graph without Reviewer, graph with the old Reviewer, graph with the fixed Reviewer, and AutoGluon (see the note below).
+- Every system gets the same stratified split, the same features and the same candidate models. The model is chosen by cross-validated MCC on training data only.
+- Corruption is seeded and applied to training data only: label flips (5, 15, 30%) plus impossible values (2, 5, 5%). The corrupted rows are recorded, so the Reviewer can be scored as a detector.
+- Seeds: Heart Disease 10, NYC Taxi 3, Amazon Reviews 3. Samples: 5000 rows for NYC Taxi and Amazon, 303 rows for Heart.
+- Metrics: MCC (Matthews Correlation Coefficient: 0 is chance, 1 is perfect), balanced accuracy, specificity, F1, recall, precision, AUC. F1 is reported for comparison with the first version, but it is unsafe alone, because an always-positive model already scores a high F1.
+- Train and test scores are both recorded. Train scores are measured on the corrupted training data, so they are not a clean overfitting measure.
 
----
+## The fixed Reviewer
 
-## Description
+- Drops rows with impossible values (bounds written by hand per dataset).
+- Flags a leaked feature in two ways: a single feature that separates the classes almost perfectly, and a score-jump check (a very high score that collapses when one feature is removed).
+- Flags rows that look mislabeled, but removes them only if a nested cross-validation test shows that removing them helps. In every run so far, it never passed that test, so these rows were reported, not removed.
+- If the model is degenerate (predicts almost everyone positive, or almost no one), it retries with a different strategy: class weights, a tuned threshold, or another model.
+- The old Reviewer removed suspected wrong labels without checking that it helped, which cost accuracy on Heart Disease.
 
-This project moves beyond evaluating third-party "black box" tools to engineering a custom, stateful multi-agent system using LangGraph. While standard agents (like ChatGPT) follow linear, one-shot processes, this research builds a cyclic architecture where agents can plan, execute, critique, and self-correct. By developing an internal "Analyst-Reviewer" loop, the project explores the frontier of Agentic Reasoning — testing whether a structured graph of specialized agents can outperform monolithic AI models in reliability, code quality, and handling "adversarial" or "noisy" data science tasks.
+## Results (held-out test set, mean over seeds)
 
-| Type | Name | Description | Website | Strength |
+MCC, with F1 in brackets. Always positive has MCC 0.000 everywhere, and F1 0.629 (Heart), 0.889 (Taxi) and 0.850 (Amazon). The single agent and the graph without Reviewer use the same models on the same data, so their scores are identical.
+
+| Dataset | Label noise | Single agent / graph, no Reviewer | Graph + old Reviewer | Graph + fixed Reviewer |
 |---|---|---|---|---|
-| Notebook agent | ChatGPT Advanced Data Analysis | Upload data → automatic cleaning, analysis, modeling | https://chat.openai.com | Fast exploratory analysis |
-| AutoML agent | AutoGluon | Automated model selection, feature engineering, tuning | https://auto.gluon.ai | Strong tabular ML performance |
-| Multi-agent research system | Microsoft AutoGen | Agents collaborate to plan experiments and critique results | https://github.com/microsoft/autogen | Research workflows |
-| Workflow agent | LangGraph | Stateful agent graphs for long-running analytical pipelines | https://langchain-ai.github.io/langgraph | Persistent reasoning loops |
+| Heart Disease | 0% | 0.646 (0.797) | 0.638 (0.793) | 0.650 (0.799) |
+| Heart Disease | 5% | 0.654 (0.801) | 0.632 (0.790) | 0.654 (0.799) |
+| Heart Disease | 15% | 0.651 (0.798) | 0.562 (0.756) | 0.628 (0.787) |
+| Heart Disease | 30% | 0.504 (0.723) | 0.443 (0.702) | 0.466 (0.710) |
+| Amazon Reviews | 0% | 0.587 (0.898) | 0.587 (0.898) | 0.587 (0.898) |
+| Amazon Reviews | 5% | 0.574 (0.893) | 0.577 (0.895) | 0.577 (0.895) |
+| Amazon Reviews | 15% | 0.545 (0.882) | 0.553 (0.886) | 0.553 (0.886) |
+| Amazon Reviews | 30% | 0.532 (0.889) | 0.532 (0.889) | 0.532 (0.889) |
+| NYC Taxi (payment_type dropped) | 0% | 0.202 (0.894) | 0.172 (0.841) | 0.129 (0.806) |
+| NYC Taxi (payment_type dropped) | 5% | 0.206 (0.894) | 0.156 (0.860) | 0.156 (0.860) |
+| NYC Taxi (payment_type dropped) | 15% | 0.206 (0.894) | 0.157 (0.840) | 0.157 (0.840) |
+| NYC Taxi (payment_type dropped) | 30% | 0.206 (0.894) | 0.130 (0.780) | 0.130 (0.780) |
 
----
+Standard deviations over seeds are in `results_full/full_all.csv`. On Heart Disease they are about 0.1 MCC, so the differences between systems at 0% to 15% noise are within the spread.
 
-## Project Objective
+Fixed Reviewer minus no Reviewer (MCC): Heart Disease +0.003, -0.001, -0.023, -0.038; Amazon 0.000, +0.003, +0.008, 0.000; NYC Taxi -0.073, -0.050, -0.049, -0.076 (for 0, 5, 15, 30% noise).
 
-The primary goal is to benchmark the efficacy of stateful multi-agent orchestration against single-agent and AutoML baselines. This project aims to answer:
+### AutoGluon
 
-- Can a cyclic multi-agent graph (LangGraph) significantly reduce hallucinations and logical errors compared to single-agent assistants?
-- Does a "Reviewer" node in an agentic workflow produce more reliable results than one-shot generation?
-- How do different agent architectures (Linear vs. Cyclic vs. AutoML) recover when faced with corrupted or ambiguous data?
+AutoGluon is not part of the `full_*.csv` tables above. An earlier run (60 second limit, medium quality, different seeds) gave Heart Disease MCC 0.642 (clean), 0.605 (15%), 0.468 (30%); Amazon 0.588, 0.573, 0.517; NYC Taxi 0.139 (clean), 0.125 (15%). That puts it level with the single agent on Heart and Amazon and lower on Taxi. Those numbers are from a different run and are not directly comparable. Results of the same-split AutoGluon run, if available, are in `results_full/full_autogluon.csv`.
 
----
+## How well the Reviewer found the corrupted data
 
-## How The System Works (The Hospital Analogy)
-
-Think of it like a hospital quality control process:
-
-Patient Data → Triage Nurse → Lab Technician → Doctor → Senior Reviewer
-↓
-"This diagnosis looks wrong"
-↓
-Send back to Lab Technician or Doctor
-↓
-Final Report (only when correct)
-
-### The 5 Nodes
-
-**Node 1 — The Planner (Triage Nurse)**
-Analyzes the dataset schema and sets the strategy. Identifies problem type (classification vs regression), risks (imbalance, missing values, noisy data), and recommends an approach. Uses Llama 3.2 to reason about the data.
-
-**Node 2 — The EDA Analyst (Lab Technician)**
-Performs exploratory data analysis, cleans data, and identifies outliers. Handles missing values using clinically appropriate methods — mode for categorical columns, median for continuous. Generates visualizations for understanding the data.
-
-**Node 3 — The ML Architect (Doctor)**
-Selects algorithms (Random Forest, Logistic Regression, Gradient Boosting), trains models, and picks the best one by F1 score. Generates SHAP values to explain why the model makes each prediction.
-
-**Node 4 — The Quality Reviewer (Senior Reviewer — The Star)**
-Acts as the scientific guardrail. Checks:
-- **Recall:** Is the model catching real cases or just predicting the majority class?
-- **SHAP Dominance:** Is one feature suspiciously dominant? That signals data leakage.
-- **Routing Decision:** retry_ml → back to ML Architect, retry_eda → back to EDA Analyst, pass → Report Writer
-
-**Node 5 — The Report Writer**
-Synthesizes the final journey — documenting results, errors caught, corrections made, and key findings with SHAP explanations.
-
----
-
-## The Quality Reviewer Rules (Guardrails)
-
-### Statistical Logic Gate
-- **Leakage Detection:** SHAP dominance check — if one feature accounts for >95% of importance, flag as leakage
-- **Imbalance Audit:** Rejects models that only report accuracy for imbalanced datasets — recall must be checked
-- **Impossible Values:** Flags unrealistic data points (negative taxi fares, negative trip durations) for re-cleaning
-
-### Explainability Gate
-- **SHAP Consistency:** Verifies feature importance aligns with EDA findings
-- **Logical Grounding:** Rejects generic explanations in favor of data-backed insights
-
----
-
-## Datasets Used
-
-### Heart Disease (303 patients, 14 clinical features)
-- **Source:** Kaggle — UCI Heart Disease Dataset
-- **URL:** https://www.kaggle.com/datasets/redwankarimsony/heart-disease-uci
-- **Target:** Binary — presence of heart disease (0/1)
-- **Challenge:** Missing values in ca and thal (critical clinical features)
-- **Key finding:** `thalach` (max heart rate) and `cp` (chest pain) are top predictors
-
-### NYC Yellow Taxi (2.96M trips → 50K sample)
-- **Source:** NYC TLC Trip Record Data
-- **URL:** https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
-- **Target:** Binary — did the passenger tip? (0/1)
-- **Challenge:** 333,403 impossible values removed (negative fares, negative durations)
-- **Key finding:** payment_type caused data leakage — AUC dropped from 0.94 to 0.56 after removal
-
-### Amazon Beauty Reviews (701K reviews → 50K sample)
-- **Source:** HuggingFace Hub — McAuley-Lab/Amazon-Reviews-2023
-- **URL:** https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023
-- **Target:** Binary — Positive (4-5 stars) vs Negative (1-3 stars)
-- **Challenge:** 71/29 class imbalance
-- **Key finding:** Title length is the strongest predictor of review sentiment
-
----
-
-## Benchmark Results
-
-### Clean Data Performance
-
-| Dataset | LangGraph F1 | Single Agent F1 | AutoGluon F1 | LangGraph Wins? |
-|---|---|---|---|---|
-| Heart Disease | **88.14%** | 88.14% | 73.08% | ✅ vs AutoGluon |
-| NYC Taxi | **89.41%** | 88.42% | 89.27% | ✅ |
-| Amazon Reviews | **83.27%** | 76.75% | 82.74% | ✅ |
-
-### Under Adversarial Conditions
-(15% label flipping + 5% impossible values injected)
-
-| Dataset | LangGraph F1 | Single Agent F1 | Advantage |
+| Dataset | Impossible values found | Flipped labels flagged (fixed Reviewer) | Flipped labels found (old Reviewer) |
 |---|---|---|---|
-| Heart Disease | **68.00%** | 58.33% | +16.6% |
-| NYC Taxi | **83.56%** | 81.28% | +2.8% |
-| Amazon Reviews | **78.82%** | 70.49% | +11.8% |
+| Heart Disease | all (precision 1.0, recall 1.0) | precision 0.41, recall 0.52 | precision 0.50, recall 0.30 |
+| Amazon Reviews | all | precision 0.60, recall 0.54 | none |
+| NYC Taxi | all | precision 0.40, recall 0.29 | none |
+| Injected leak (Heart) | not applicable | not applicable | not applicable |
 
-**Key insight:** On clean data, systems perform similarly. Under adversarial conditions, LangGraph degrades significantly less because the Quality Reviewer catches errors before they reach the final report.
+Leak test: a near-copy of the label was added as a feature. The single agent and the graph without Reviewer scored MCC 1.000. Both Reviewers reported the honest score of about 0.65, and the fixed Reviewer flagged the leaky feature in 10 of 10 runs.
 
----
+The fixed Reviewer also flags many rows on clean data (about 270 on Amazon, 28 on Heart, 616 on Taxi). These are mostly naturally hard rows, so a flag means "worth a look", not "wrong label".
 
-## Project Structure
+## What this shows
 
-notebooks/
-├── langgraph_agent.API.ipynb        # Technical reference — all nodes documented
-├── langgraph_agent.example.ipynb   # Step-by-step walkthrough for new users
-├── Heart_Disease_eda.png            # EDA visualization
-├── Heart_Disease_shap.png           # SHAP feature importance
-├── NYC_Taxi_eda.png
-├── NYC_Taxi_shap.png
-├── Amazon_Reviews_eda.png
-└── Amazon_Reviews_shap.png
-requirements.txt                     # All dependencies with pinned versions
-Dockerfile                           # Reproducible containerized environment
-docker_build.sh                      # Build script
-docker_name.sh                       # Image naming configuration
+1. On accuracy there is no clear winner. LangGraph, the single agent and AutoGluon are within each other's spread on Heart Disease and Amazon, and the simple models beat AutoGluon on Taxi.
+2. The Reviewer does not improve accuracy. The fixed version matches no Reviewer on clean data for Heart and Amazon, and is slightly lower on Heart at 15% and 30% noise, within the spread.
+3. On NYC Taxi the Reviewer lowers MCC and F1 but raises balanced accuracy (0.569 vs 0.527 on clean data), because its degenerate-model retry switches to a balanced model. This is a different trade-off, not a clear improvement or loss.
+4. The Reviewer is useful for data integrity. It finds all injected impossible values and catches an injected leak where the other systems silently report a perfect score.
+5. It misses the natural `payment_type` leak in NYC Taxi. In an earlier run, keeping that one column lifted every system from MCC 0.21 to 0.91, and no system removed it.
+6. F1 is a poor comparison metric here. On Taxi, always positive scores F1 0.889 against 0.894 for the best system. MCC and balanced accuracy separate real models from the baseline.
+7. Rules route the graph. The LLM only writes the plan note and the summary, so these runs do not test LLM decision making.
 
----
+## Limits
 
-## How To Run
+- The single agent is a stand-in for a one-pass assistant. I did not run ChatGPT.
+- Taxi and Amazon use 3 seeds and 5000 rows; Heart uses 10 seeds and 303 rows. Small differences are not reliable.
+- The leak test uses an injected feature that is easy to spot by design.
+- The Reviewer's impossible-value bounds are written by hand per dataset.
+- The fixed Reviewer was tuned on separate seeds (100 to 104) of Heart Disease only. Taxi and Amazon were not used for tuning.
+- Train scores are measured on corrupted training data, so a train-test gap mixes overfitting with label noise.
+- The Reviewer's check for removing mislabeled rows never passed its safety test in these runs, so no labels were removed.
 
-### Prerequisites
-1. Install Ollama: https://ollama.com/download
-2. Pull Llama 3.2: `ollama pull llama3.2`
-3. Install dependencies: `pip install -r requirements.txt`
+## Files
 
-### Run With Docker
-```bash
-bash docker_build.sh
-docker run -p 8888:8888 gpsaggese/langgraph_agentic_ds
-```
+- `agentic_bench.py`: the benchmark harness (splits, systems, Reviewer, corruption, metrics).
+- `agentic_viz.py`: plots and tables.
+- `full_study.ipynb`: the end-to-end notebook (EDA, one walkthrough run per dataset with SHAP, full benchmark, charts, leak test).
+- `run_heart.py`, `run_heart_ag.py`, `run_amazon_ag.py`, `run_taxi.py`, `run_taxi_ag.py`, `run_benchmark.py`, `run_leak.py`: scripts from the first fair benchmark.
+- `results/`: raw CSVs from the first fair benchmark.
+- `results_full/`: raw CSVs and plots from the full study above.
 
-### Run Locally
-1. Start Ollama in terminal: `ollama serve`
-2. Open Jupyter: `jupyter notebook`
-3. Open `notebooks/langgraph_agent.example.ipynb`
-4. Run all cells from top to bottom
+## How to run
 
----
-
-## Tasks Completed
-
-1. Environment Setup — Version pinning for reproducibility
-2. Graph Construction — StateGraph with conditional edges in LangGraph
-3. Benchmarking — All competitors run against all 3 datasets
-4. Adversarial Reliability Test — Label flipping and impossible value injection
-5. Interpretability — SHAP analysis with Quality Reviewer validation
-
-![Architecture diagram of the LangGraph multi-agent workflow](Benchmarkingworkflow.png)
----
-
-## Useful Resources
-- **LangGraph Documentation:** https://langchain-ai.github.io/langgraph
-- **AutoGluon Documentation:** https://auto.gluon.ai/stable/tutorials/tabular/tabular-quick-start.html
-- **Microsoft AutoGen GitHub:** https://github.com/microsoft/autogen
-- **OpenML Benchmark Suite:** https://www.openml.org/search?type=benchmark
+1. Install: `pip install langgraph langchain-ollama scikit-learn pandas numpy matplotlib seaborn shap vaderSentiment pyarrow jupyter` (add `autogluon.tabular` for AutoGluon).
+2. Put the data where the notebook expects it (Heart Disease CSV, NYC Taxi parquet, Amazon Beauty CSV) and edit the paths in the first code cell.
+3. Optional: start Ollama (`ollama serve`, `ollama pull llama3.2`) and set `USE_LLM = True` for LLM summaries.
+4. Open `full_study.ipynb` and run all cells. Set `QUICK=1` in the environment first for a short test. Results are written to `outputs/`.
