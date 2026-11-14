@@ -28,7 +28,9 @@ from sklearn.metrics import (accuracy_score, average_precision_score,
                              balanced_accuracy_score, f1_score,
                              matthews_corrcoef, precision_score, recall_score,
                              roc_auc_score)
-from sklearn.model_selection import cross_val_predict, cross_val_score, train_test_split
+from sklearn.base import clone
+from sklearn.model_selection import (StratifiedKFold, cross_val_predict, cross_val_score,
+                                     train_test_split)
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from langgraph.graph import END, StateGraph
@@ -182,6 +184,84 @@ def label_issue_rids(X, y, rids, cutoff=0.1):
     return np.asarray(rids)[p_given < cutoff]
 
 
+# ---- reviewer v2: every fix has to PROVE it helps before it is accepted -------------------
+def _fast_models():
+    return [make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000)),
+            HistGradientBoostingClassifier(max_iter=100, random_state=0)]
+
+
+def label_issue_scores(X, y):
+    """Out-of-fold probability of the GIVEN label for every row (low = suspicious)."""
+    if y.value_counts().min() < 5:
+        return None
+    p = cross_val_predict(HistGradientBoostingClassifier(random_state=0), X, y, cv=5,
+                          method="predict_proba")
+    return p[np.arange(len(y)), y.values]
+
+
+def cv_gain_from_dropping(X, y, cuts, seeds=(0, 1, 2)):
+    """
+    Honest test of "does removing suspected wrong labels help?".
+    Inside every CV fold the label detector sees ONLY that fold's training rows (nested), so no
+    information from the validation rows leaks into the choice of which rows to drop. Both
+    versions are scored on the same validation rows, all of them, with the given labels.
+    Returns {cut: (mean MCC gain, share of folds where dropping won)}.
+    """
+    res = {c: [] for c in cuts}
+    for sd in seeds:
+        for tri, vai in StratifiedKFold(5, shuffle=True, random_state=sd).split(X, y):
+            Xt, yt = X.iloc[tri], y.iloc[tri]
+            if len(vai) < 5 or y.iloc[vai].nunique() < 2:
+                continue
+            ps = label_issue_scores(Xt, yt)
+            if ps is None:
+                continue
+            base = {}
+            for i, m in enumerate(_fast_models()):
+                base[i] = matthews_corrcoef(y.iloc[vai], clone(m).fit(Xt, yt).predict(X.iloc[vai]))
+            for c in cuts:
+                keep = ps >= c
+                if keep.all() or yt[keep].nunique() < 2:
+                    continue
+                for i, m in enumerate(_fast_models()):
+                    try:
+                        b = matthews_corrcoef(y.iloc[vai], clone(m).fit(Xt[keep], yt[keep]).predict(X.iloc[vai]))
+                        res[c].append(b - base[i])
+                    except Exception:
+                        pass
+    out = {}
+    for c, d in res.items():
+        d = np.asarray(d)
+        out[c] = (float(d.mean()), float((d > 0).mean())) if len(d) else (0.0, 0.0)
+    return out
+
+
+def _cv_mcc(X, y, seed=0):
+    s = []
+    for tri, vai in StratifiedKFold(5, shuffle=True, random_state=seed).split(X, y):
+        m = HistGradientBoostingClassifier(max_iter=60, random_state=0).fit(X.iloc[tri], y.iloc[tri])
+        s.append(matthews_corrcoef(y.iloc[vai], m.predict(X.iloc[vai])))
+    return float(np.mean(s))
+
+
+def score_jump_leaks(X, y, mcc_floor=0.85, drop_min=0.30):
+    """
+    Leak suspect = the model is suspiciously good AND removing ONE feature collapses it.
+    Only runs when cross-validated MCC is above mcc_floor, so normal datasets are never touched.
+    """
+    if y.nunique() < 2 or X.shape[1] < 2:
+        return {}
+    base = _cv_mcc(X, y)
+    if base < mcc_floor:
+        return {}
+    out = {}
+    for c in X.columns:
+        gap = base - _cv_mcc(X.drop(columns=[c]), y)
+        if gap > drop_min:
+            out[c] = round(float(gap), 3)
+    return out
+
+
 def is_degenerate(m):
     return (m["balanced_acc"] < 0.55
             or (m["recall"] > 0.97 and m["specificity"] < 0.10)
@@ -200,11 +280,15 @@ class State(TypedDict, total=False):
     pending: dict
     dropped_impossible: list
     dropped_label: list
+    flagged_label: list
     label_checked: bool
     attempted: list
     next_strategy: str
     history: list
     metrics: dict
+    train_metrics: dict
+    model_obj: object
+    feature_names: list
     model_name: str
     review_decision: str
     review_passes: int
@@ -215,10 +299,14 @@ class State(TypedDict, total=False):
 
 
 def build_graph(use_reviewer=True, llm=None, strategy_mode="rules",
-                label_rate_thresh=0.05, max_retries=3):
+                label_rate_thresh=0.05, max_retries=3, reviewer_mode="v1",
+                label_cutoffs=(0.1, 0.2, 0.3), min_gain=0.05, min_win=0.75):
     """
     strategy_mode: "rules" picks the next untried strategy in order.
                    "llm" asks the LLM to pick from the untried menu (falls back to rules).
+    reviewer_mode: "v1" drops rows the label detector flags (if more than label_rate_thresh).
+                   "v2" tries several cutoffs and only drops rows if cross-validation shows the
+                   drop helps by at least min_gain MCC. It also adds a score-jump leak check.
     """
 
     def planner(state: State) -> State:
@@ -275,8 +363,10 @@ def build_graph(use_reviewer=True, llm=None, strategy_mode="rules",
         thr = best_threshold(model, Xtr, ytr) if strat == "threshold" else 0.5
         prob = model.predict_proba(Xte)[:, 1]
         m = score(yte, (prob >= thr).astype(int), prob)
-        hist.append({"strategy": strat, "model": name, "threshold": thr, "metrics": m})
-        return {"metrics": m, "model_name": name, "history": hist, "attempted": attempted,
+        ptr = model.predict_proba(Xtr)[:, 1]
+        mtr = score(ytr, (ptr >= thr).astype(int), ptr)
+        hist.append({"strategy": strat, "model": name, "threshold": thr, "metrics": m, "train_metrics": mtr})
+        return {"metrics": m, "train_metrics": mtr, "model_obj": model, "feature_names": list(Xtr.columns), "model_name": name, "history": hist, "attempted": attempted,
                 "log": state.get("log", []) + [f"ml: {strat}/{name} thr={thr:.2f} "
                                                f"bal_acc={m['balanced_acc']:.3f} mcc={m['mcc']:.3f}"]}
 
@@ -301,20 +391,46 @@ def build_graph(use_reviewer=True, llm=None, strategy_mode="rules",
             pend["impossible"] = True
             found.append(f"{n_imp} impossible values")
         leaks = {c: a for c, a in leakage_suspects(X, y).items() if c not in drop_cols}
+        if reviewer_mode == "fixed":
+            leaks.update({c: g for c, g in score_jump_leaks(X, y).items() if c not in drop_cols})
         if leaks:
             pend["leaky"] = list(leaks)
             found.append(f"leak suspects {leaks}")
+        extra = {}
         label_checked = state.get("label_checked", False)
         if not label_checked:
             label_checked = True
-            rids = label_issue_rids(X, y, tr[RID].values)
-            if len(rids) / max(len(tr), 1) > label_rate_thresh:
-                pend["label_rids"] = rids
-                found.append(f"{len(rids)} suspected wrong labels")
+            if reviewer_mode == "fixed":
+                # do no harm: only drop rows if repeated CV proves it helps; otherwise just report them
+                ps = label_issue_scores(X, y)
+                best = None
+                if ps is not None:
+                    gains = cv_gain_from_dropping(X, y, label_cutoffs)
+                    for cut in label_cutoffs:
+                        mask = ps < cut
+                        if mask.sum() < 3 or mask.mean() > 0.4:
+                            continue
+                        gain, win = gains[cut]
+                        if best is None or gain > best[0]:
+                            best = (gain, cut, mask, win)
+                if best is not None:
+                    flagged = list(tr[RID].values[best[2]])
+                    if best[0] >= min_gain and best[3] >= min_win and best[0] >= 0.05:
+                        pend["label_rids"] = tr[RID].values[best[2]]
+                        found.append(f"{len(flagged)} suspected wrong labels removed (CV gain {best[0]:+.3f})")
+                    else:
+                        log.append(f"reviewer: {len(flagged)} rows look mislabeled but dropping them did not "
+                                   f"clearly help (CV gain {best[0]:+.3f}), reported only")
+                        extra["flagged_label"] = flagged
+            else:
+                rids = label_issue_rids(X, y, tr[RID].values)
+                if len(rids) / max(len(tr), 1) > label_rate_thresh:
+                    pend["label_rids"] = rids
+                    found.append(f"{len(rids)} suspected wrong labels")
         if found:
             log.append("reviewer: " + "; ".join(found) + " -> retry_eda")
             return {"review_decision": "retry_eda", "pending": pend, "label_checked": label_checked,
-                    "review_passes": passes, "retry_count": retries + 1, "log": log}
+                    "review_passes": passes, "retry_count": retries + 1, "log": log, **extra}
 
         # model checks: route back to ML with a NEW strategy, or stop
         hist = state["history"]
@@ -336,11 +452,11 @@ def build_graph(use_reviewer=True, llm=None, strategy_mode="rules",
                             pass
                     log.append(f"reviewer: degenerate model -> retry_ml with {pick}")
                     return {"review_decision": "retry_ml", "next_strategy": pick, "label_checked": label_checked,
-                            "review_passes": passes, "retry_count": retries + 1, "log": log}
+                            "review_passes": passes, "retry_count": retries + 1, "log": log, **extra}
                 log.append("reviewer: degenerate model and every strategy tried, passing with warning")
         else:
             log.append("reviewer: all checks passed")
-        return {"review_decision": "pass", "label_checked": label_checked, "review_passes": passes, "log": log}
+        return {"review_decision": "pass", "label_checked": label_checked, "review_passes": passes, "log": log, **extra}
 
     def report(state: State) -> State:
         m = state["metrics"]
@@ -440,17 +556,21 @@ def run_experiment(datasets, seeds=range(5), conditions=DEFAULT_CONDITIONS, use_
     rows = []
     app_off = build_graph(use_reviewer=False, llm=None)
     app_on = build_graph(use_reviewer=True, llm=llm, strategy_mode=strategy_mode)
+    app_v2 = build_graph(use_reviewer=True, llm=llm, strategy_mode=strategy_mode, reviewer_mode="fixed")
 
     def add(system, ds, seed, ln, ir, res, t0, tr_info=None, out=None):
         r = {"dataset": ds, "system": system, "seed": seed, "label_noise": ln, "imp_rate": ir,
-             **res["metrics"], "model": res.get("model"), "strategy": res.get("strategy"),
+             **res["metrics"], **{f"train_{k}": v for k, v in res.get("train_metrics", {}).items()}, "model": res.get("model"), "strategy": res.get("strategy"),
              "seconds": round(time.time() - t0, 1)}
         if out is not None:
             r["retries"], r["passes"] = out.get("retry_count", 0), out.get("review_passes", 0)
             r["n_dropped_impossible"], r["n_dropped_label"] = len(out["dropped_impossible"]), len(out["dropped_label"])
             r["leaky_flagged"] = "leaky_feature" in out.get("drop_cols", [])
+            r["n_flagged_label"] = len(out.get("flagged_label", []))
+            r["n_features_dropped"] = len(out.get("drop_cols", []))
+            r["features_dropped"] = ",".join(out.get("drop_cols", []))
             if tr_info:
-                r["label_det_prec"], r["label_det_rec"] = _pr(out["dropped_label"], tr_info["flipped"])
+                r["label_det_prec"], r["label_det_rec"] = _pr(list(out["dropped_label"]) + list(out.get("flagged_label", [])), tr_info["flipped"])
                 r["imp_det_prec"], r["imp_det_rec"] = _pr(out["dropped_impossible"], tr_info["impossible"])
         rows.append(r)
 
@@ -467,11 +587,12 @@ def run_experiment(datasets, seeds=range(5), conditions=DEFAULT_CONDITIONS, use_
                     {"metrics": always_positive(test[target]), "model": "-", "strategy": "-"}, t0)
                 t0 = time.time()
                 add("single_agent", ds, seed, ln, ir, run_single_agent(tr_c, test, target), t0)
-                for name, app in [("graph_no_reviewer", app_off), ("graph_reviewer", app_on)]:
+                for name, app in [("graph_no_reviewer", app_off), ("graph_reviewer_v1", app_on),
+                                  ("graph_reviewer_fixed", app_v2)]:
                     t0 = time.time()
                     out = run_graph(app, tr_c, test, target, ds)
                     add(name, ds, seed, ln, ir,
-                        {"metrics": out["metrics"], "model": out["model_name"],
+                        {"metrics": out["metrics"], "train_metrics": out.get("train_metrics", {}), "model": out["model_name"],
                          "strategy": out["history"][-1]["strategy"]}, t0, info, out)
                 if use_autogluon:
                     t0 = time.time()
@@ -495,9 +616,10 @@ def detector_table(results):
     """How well did the reviewer find the rows we corrupted?"""
     if isinstance(results, str):
         results = pd.read_csv(results)
-    r = results[results.system == "graph_reviewer"]
-    cols = ["label_det_prec", "label_det_rec", "imp_det_prec", "imp_det_rec", "retries", "leaky_flagged"]
-    return r.groupby(["dataset", "label_noise", "imp_rate"])[cols].mean().round(3)
+    r = results[results.system.isin(["graph_reviewer_v1", "graph_reviewer_fixed"])]
+    cols = [c for c in ["label_det_prec", "label_det_rec", "imp_det_prec", "imp_det_rec", "retries",
+                        "leaky_flagged", "n_features_dropped", "n_dropped_label"] if c in r.columns]
+    return r.groupby(["dataset", "label_noise", "imp_rate", "system"])[cols].mean().round(3)
 
 
 # ----------------------------------------------------------------------------
