@@ -1,0 +1,21 @@
+term,outcome,n,base_rate,OR,lo,hi,p
+age_c,A. Exit vs inactive (active dropped),246,0.545,1.8,1.008,3.215,0.047
+age_c2,A. Exit vs inactive (active dropped),246,0.545,0.393,0.166,0.927,0.033
+ivy,A. Exit vs inactive (active dropped),246,0.545,0.69,0.277,1.716,0.425
+has_grad,A. Exit vs inactive (active dropped),246,0.545,1.044,0.594,1.835,0.881
+age_c,B. Exit vs everything else (active = 0),404,0.332,1.383,0.833,2.297,0.21
+age_c2,B. Exit vs everything else (active = 0),404,0.332,0.582,0.326,1.038,0.067
+ivy,B. Exit vs everything else (active = 0),404,0.332,0.851,0.436,1.659,0.635
+has_grad,B. Exit vs everything else (active = 0),404,0.332,1.008,0.638,1.592,0.973
+age_c,C. IPO only,404,0.035,1.398,0.385,5.075,0.611
+age_c2,C. IPO only,404,0.035,0.541,0.07,4.184,0.556
+ivy,C. IPO only,404,0.035,0.0,0.0,0.0,0.0
+has_grad,C. IPO only,404,0.035,2.174,0.862,5.482,0.1
+age_c,D. Acquired only (IPO dropped),390,0.308,1.322,0.792,2.209,0.286
+age_c2,D. Acquired only (IPO dropped),390,0.308,0.606,0.33,1.113,0.106
+ivy,D. Acquired only (IPO dropped),390,0.308,0.966,0.487,1.913,0.92
+has_grad,D. Acquired only (IPO dropped),390,0.308,0.899,0.556,1.453,0.664
+age_c,E. Survival (not inactive),404,0.723,1.511,0.865,2.64,0.147
+age_c2,E. Survival (not inactive),404,0.723,0.694,0.395,1.217,0.202
+ivy,E. Survival (not inactive),404,0.723,0.93,0.478,1.808,0.83
+has_grad,E. Survival (not inactive),404,0.723,1.114,0.683,1.819,0.665

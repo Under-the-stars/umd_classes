@@ -1,0 +1,51 @@
+fullName,company_in_dataset,industry,sector,fy,pb_previousCompanyName,pb_linkedinPreviousJobTitle,pb_linkedinPreviousJobDateRange,exp_rel_years,exp3
+Yang Forjindam,PocketSuite,Enterprise Resource Planning,software_infra,2014.0,NetSuite,Software Engineer,2000 - 2011,11.0,1.0
+Anish Dhar,Cortex,World Domination,other,2019.0,Uber,Engineering,2015 - Oct 2019,,
+Panickos Neophytou,NetBeez,Software,software_infra,2013.0,University of Cyprus,Research Assistant,May 2003 - Aug 2004,0.0,0.0
+Stefano Gridelli,NetBeez,Software,software_infra,2013.0,UPMC,Senior Network Engineer - Network Design Group,Jun 2007 - Sep 2013,6.0,1.0
+Fei Deyle,Lollipuff,E-Commerce,commerce_marketplace,2012.0,Minsait ACS,Sales Director,2009 - Jun 2012,0.0,0.0
+Michael Demarais,Rainbow,Games,media_social_games,2019.0,Balance.io,Engineer,Aug 2018 - Feb 2019,0.0,0.0
+Nelson Vazquez,Revl,Career Management,health_bio,2015.0,EMS Technologies,Aerospace Engineer,Feb 2013 - Jul 2013,0.0,0.0
+Santi Herrero,EdPuzzle,Education,education,2013.0,www.kingdemates.org,Software Engineer (Web Developer & Designer),Sep 2012 - Jul 2013,1.0,0.0
+Liam Don,ClassDojo,Kids,other,2011.0,Durham University,PhD Researcher,Jan 2009 - Jun 2011,,
+Zachary Gittelman,Mango Health,Mobile,software_infra,2023.0,Mango Health,Co-Founder and CTO,Oct 2022 - Sep 2025,1.0,0.0
+Shachar Zohar,Peer5,Photography,other,2012.0,Peer5,Co-Founder and CTO,Oct 2011 - Aug 2021,,
+Faiyam Rahman,Blaze,Hardware + Software,software_infra,2023.0,Mango Markets,DAO Contributor,Feb 2022 - May 2023,1.0,0.0
+Mark Probst,Glide,Messaging,media_social_games,2018.0,Microsoft,Principal Software Engineer,2016 - Aug 2018,0.0,0.0
+Zach Witzel,Helium,Publishing,other,2024.0,Uber,Product Lead,Jun 2019 - Sep 2023,,
+Nikhil Unni,Cortex,World Domination,other,2019.0,Twilio,Senior Software Engineer,Mar 2018 - Nov 2019,,
+Matin Movassate,Heap,Analytics,software_infra,2013.0,Facebook,Product Manager,Jul 2011 - Apr 2012,0.0,0.0
+Troy Astorino,PicnicHealth,Medical,health_bio,2014.0,SpaceX,"Software Engineer - Guidance, Navigation, and Control",Jun 2012 - Oct 2012,0.0,0.0
+Sarah Nahm,Lever,Recruiting,other,2012.0,Google,"Product Marketing Manager, Google Chrome",Sep 2008 - Nov 2011,,
+Jason DeRoner,TeachBoost,All Students,education,2012.0,"TeachBoost (acquired by SchoolStatus, 2022)",CEO/Co-founder,Sep 2010 - Feb 2022,2.0,0.0
+Daniel Kimerling,Standard Treasury,Enterprise Software,software_infra,2013.0,Milken Institute,Milken Young Leaders Circle,Apr 2023 - Present,0.0,0.0
+Christian Baroni,Rainbow,Games,media_social_games,2019.0,Balance,"Co-Founder, Designer",2016 - Feb 2019,3.0,1.0
+Jamison Mercurio,Mango Health,Mobile,software_infra,2023.0,Mango Health,Co-Founder and CEO (YC W24),Dec 2022 - Sep 2025,0.0,0.0
+Jerry Chu,LOFTY,Marketplaces,commerce_marketplace,2018.0,Barclays,Treasury Risk Management Analyst,Jun 2017 - Aug 2017,0.0,0.0
+Maran Nelson,Crowdery,Fashion,commerce_marketplace,2013.0,OpenAI,Advisor,Feb 2018 - Dec 2019,0.0,0.0
+Sergie Magdalin,Webflow,Software,software_infra,2012.0,Muir Skate Longboard Shop,Web & UX Designer,Sep 2006 - Aug 2012,0.0,0.0
+David Haisha Chen,Strikingly,Mobile,software_infra,2013.0,ECSEL,Director,Oct 2011 - May 2012,1.0,0.0
+Andrew Kurland,Greentoe,E-Commerce Platforms,commerce_marketplace,2012.0,Deloitte,Salesforce.com Senior Consultant,Jun 2007 - May 2012,0.0,0.0
+Andrew Harada Rowland,Classkick,Education,education,2014.0,Google,Product Partner Manager,Mar 2011 - Sep 2013,2.0,0.0
+Steven Wanderski,Popular Pays,Virtual Currency,other,2013.0,Steven Wanderski,Freelance Web Developer,Jan 2011 - Present,,
+Jin Chung,Rainbow,Games,media_social_games,2019.0,Balance.io,Lead Software Engineer,Oct 2017 - Feb 2019,0.0,0.0
+Jasiel Cardenas,BeGo,Education,education,2019.0,Nova Logistics,Gerente de operaciones,Feb 2010 - Feb 2019,0.0,0.0
+Ross Rich,Accord,Real Estate,commerce_marketplace,2020.0,Stripe,"Global Platforms, Enterprise Partnerships Lead",2017 - 2020,0.0,0.0
+Vlad Magdalin,Webflow,Software,software_infra,2012.0,Intuit,Senior Software Engineer,Jul 2006 - Aug 2012,6.0,1.0
+Sam Crombie,ActionBase,Advertising,media_social_games,2024.0,Microsoft,Product Manager,Dec 2023 - Jun 2024,0.0,0.0
+Stanley Tang,DoorDash,Small and Medium Businesses,other,2013.0,Facebook,Software Engineer,Jun 2012 - Sep 2012,,
+Wade Roberts,Educreations,iPad,other,2010.0,RockYou,Sr. Product Manager,Jul 2008 - Dec 2009,,
+Xavi Verg√É¬©s,EdPuzzle,Education,education,2013.0,everis,Solutions Assistant,Oct 2012 - Jul 2013,0.0,0.0
+Gokul Prabhakaran,Violet,Hardware + Software,software_infra,2019.0,Embrace,Co-Founder & CTO,Jul 2016 - Aug 2026,3.0,1.0
+Dhruv Saxena,ShipBob,Shipping,other,2014.0,InContext Solutions,Software Developer,Jun 2012 - Jun 2014,,
+Scott Cara,Elevate,Video,media_social_games,2024.0,Sycamore Partners,Vice President,Aug 2021 - Feb 2024,0.0,0.0
+Eduardo Portet,Index,Enterprise Software,software_infra,2019.0,Medidata Solutions,Data Engineer,2017 - 2017,0.0,0.0
+Giovanni Casinelli,Aspire,Enterprise Software,software_infra,2018.0,BonAppetour,"Co-founder, CEO & CTO",Feb 2017 - Jul 2017,0.0,0.0
+Apoorva Mehta,Instacart,Groceries,other,2012.0,Amazon,Fulfillment Optimization SDE,2008 - 2010,,
+Venky B,Plivo,Mobile,software_infra,2011.0,Huawei,Lead Solutions Architect,Sep 2008 - Mar 2011,3.0,1.0
+Ryan Rich,Accord,Real Estate,commerce_marketplace,2020.0,Google,"Sales, Google Cloud",2015 - 2019,0.0,0.0
+Shishir Jakati,Helium,Publishing,other,2024.0,Amazon,Software Development Engineer,Mar 2020 - May 2024,,
+Ryan Hoover,Product Hunt,Curated Web,media_social_games,2013.0,ryanhoover.me,Writer,Jun 2012 - Present,0.0,0.0
+Andy Fang,DoorDash,Small and Medium Businesses,other,2013.0,Stanford University,CS106 Section Leader,Sep 2011 - Jun 2013,,
+Antonio Sierra,Gigwell,Online Reservations,other,2014.0,The DJ List Inc - http://thedjlist.com,Marketing Director,2011 - 2013,,
+Akbar Thobhani,SFOX,Bitcoin,other,2014.0,Airbnb,Advisor,2013 - Oct 2015,,

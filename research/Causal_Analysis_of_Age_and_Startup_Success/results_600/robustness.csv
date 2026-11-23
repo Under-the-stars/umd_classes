@@ -1,0 +1,17 @@
+term,sample,n,OR,lo,hi,p
+age_c,all plausible ages,246,1.8,1.008,3.215,0.047
+age_c2,all plausible ages,246,0.393,0.166,0.927,0.033
+ivy,all plausible ages,246,0.69,0.277,1.716,0.425
+has_grad,all plausible ages,246,1.044,0.594,1.835,0.881
+age_c,drop low-confidence ages,214,1.822,0.996,3.332,0.052
+age_c2,drop low-confidence ages,214,0.376,0.148,0.958,0.04
+ivy,drop low-confidence ages,214,0.472,0.182,1.223,0.122
+has_grad,drop low-confidence ages,214,1.454,0.777,2.72,0.242
+age_c,drop manual (Google Search) ages,194,1.88,0.964,3.667,0.064
+age_c2,drop manual (Google Search) ages,194,0.569,0.212,1.526,0.262
+ivy,drop manual (Google Search) ages,194,0.708,0.267,1.876,0.487
+has_grad,drop manual (Google Search) ages,194,0.905,0.467,1.755,0.768
+age_c,US-located founders only,197,1.76,0.878,3.527,0.111
+age_c2,US-located founders only,197,0.328,0.115,0.939,0.038
+ivy,US-located founders only,197,0.72,0.28,1.849,0.495
+has_grad,US-located founders only,197,1.011,0.54,1.891,0.973
