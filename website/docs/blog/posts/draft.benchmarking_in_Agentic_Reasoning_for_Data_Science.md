@@ -1,26 +1,24 @@
 ---
-title: "Our AI Pipeline Won. Then We Checked the Benchmark."
+title: "We Broke Our Data on Purpose. Here's Who Noticed."
+description: "What a reviewer agent catches in data science pipelines: it did not make ours more accurate, but it caught broken data and leaked features that other systems missed."
 authors:
-  - <author_id_1>
-  - <author_id_2>
-  - <author_id_3>
+  - Under-the-stars
+  - linuteresa
+  - gpsaggese
 date: 2026-11-15
-description: "A reviewer agent did not make our data science pipeline more accurate, but it caught broken data that other systems missed."
 categories:
-  - <allowed category>
+  - AI Research
+draft: true
 ---
+**TL;DR:** A reviewer agent did not make our data science pipeline more accurate. It made it safer. It found every impossible value we planted and flagged a leaked column in 10 of 10 runs, where the other systems reported a perfect score of 1.0 that meant nothing. The honest score was 0.65. The agent is not smarter. It is more careful.
+
+<!-- more -->
 
 Our multi-agent pipeline beat AutoGluon at predicting heart disease, 88% F1 against 73%. We were ready to write it up as a win.
 
 Then we looked at the test set. It had 61 rows. The two systems had used different splits, and we had picked the winning model by F1 on that same test set. The win was not real, and we had to rerun the whole project to find out what was.
 
-<!-- more -->
-
-## The short answer
-
-A reviewer agent did not make our pipeline more accurate. It made it safer.
-
-On a fair test, our multi-agent system, a single-pass pipeline and AutoGluon landed within each other's margin of error. What the reviewer did do was catch broken data. It found every impossible value we planted, and it flagged a leaked feature in 10 of 10 runs, where the other systems reported a perfect score of 1.0 that meant nothing. With the leak flagged, the honest score was 0.65.
+## Why this matters
 
 This matters because agent frameworks promise reliability, and most write-ups prove it with one impressive score. A score tells you how a system did on one dataset on one day. Reliability is different. It means the system notices when something is wrong with its inputs and says so before it reports a number you might act on. That second property is what we set out to measure, and it turned out to be harder to measure than accuracy.
 
@@ -30,7 +28,7 @@ The question: does an AI pipeline with a built-in quality checker give more reli
 
 We built the pipeline as a [LangGraph](https://www.langchain.com/langgraph) graph with five steps: plan, explore the data, train models, review, write a report. The review step is the interesting one. It checks the work and can send the graph back to an earlier step instead of moving on.
 
-We compared it with a single-pass version, with [AutoGluon](https://auto.gluon.ai), and with a model that predicts "yes" for everyone. We ran all of them on three datasets:
+We compared it with a single-pass version, with [AutoGluon](https://auto.gluon.ai), and with a model that predicts "yes" for everyone. AutoGluon ran with a 60 second limit and the medium quality preset. Every system got the same train/test split, the same corrupted training data and the same clean test set, on three datasets:
 
 - **Heart disease:** the [Cleveland data](https://archive.ics.uci.edu/dataset/45/heart+disease), 303 patients. Tiny and easy to overfit.
 - **NYC taxi tips:** a sample of [yellow cab trips](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page). Whether a ride was tipped.
@@ -57,6 +55,8 @@ flowchart LR
   D -- retry_eda --> B
   D -- retry_ml --> C
 ```
+
+In one line: Planner → EDA Analyst → ML Architect → Quality Reviewer → Report Writer, where the reviewer can send the graph back to the EDA Analyst or the ML Architect.
 
 The two arrows that go back are the point. A plain pipeline runs once and reports whatever comes out. This one can stop, fix the data and try again, up to three times.
 
@@ -88,13 +88,41 @@ By F1 they are nearly tied. By [MCC](https://en.wikipedia.org/wiki/Phi_coefficie
 
 ## What the fair test shows
 
-On accuracy, nobody clearly wins. Here is heart disease, scored with MCC on the clean test set, averaged over 10 random splits:
+On accuracy, nobody clearly wins. Here are all three systems side by side, scored with MCC on the clean test set and averaged over random splits (10 for heart disease, 3 for taxi and Amazon). "LangGraph + reviewer" is our rebuilt multi-agent pipeline:
+
+| Dataset | Wrong labels in training data | AutoGluon | Single pass | LangGraph + reviewer |
+|---|---|---|---|---|
+| Heart disease | 0% | 0.642 | 0.646 | 0.650 |
+| Heart disease | 5% | 0.623 | 0.654 | 0.654 |
+| Heart disease | 15% | 0.605 | 0.651 | 0.628 |
+| Heart disease | 30% | 0.468 | 0.504 | 0.466 |
+| Amazon reviews | 0% | 0.585 | 0.587 | 0.587 |
+| Amazon reviews | 5% | 0.589 | 0.574 | 0.577 |
+| Amazon reviews | 15% | 0.581 | 0.545 | 0.553 |
+| Amazon reviews | 30% | 0.507 | 0.532 | 0.532 |
+| NYC taxi tips | 0% | 0.094 | 0.202 | 0.129 |
+| NYC taxi tips | 5% | 0.093 | 0.206 | 0.156 |
+| NYC taxi tips | 15% | 0.118 | 0.206 | 0.157 |
+| NYC taxi tips | 30% | 0.046 | 0.206 | 0.130 |
+
+**How to read the table.**
+
+- **Heart disease and Amazon reviews: a tie.** The three systems are within a few hundredths of each other. On heart disease the score moves by about 0.1 from one random split to the next, so gaps this small are noise. All three also fall as more labels go wrong, and the fall is steepest at 30%.
+- **NYC taxi tips: AutoGluon is lowest at every noise level.** The single pass is highest and LangGraph with the reviewer sits in between. Taxi is a hard task (every MCC is 0.2 or below), and we only ran 3 splits, so treat the size of the gap with care. The ordering is the same at every noise level, though.
+- **The reviewer costs a little on taxi.** Its retry step pushes the model toward a more balanced one. On clean data that raised balanced accuracy (0.569 against 0.527) but lowered MCC.
+- **Nothing here says the multi-agent system is more accurate.** If you only wanted the best score, the single pass is as good or better everywhere.
+
+Here is the same comparison for heart disease, split by reviewer version:
 
 | Wrong labels in training data | Single pass | Reviewer (first version) | Reviewer (rebuilt) |
 |---|---|---|---|
 | 0% | 0.646 | 0.638 | 0.650 |
 | 15% | 0.651 | 0.562 | 0.628 |
 | 30% | 0.504 | 0.443 | 0.466 |
+
+![Left: heart disease MCC by amount of label noise for the single pass, the first reviewer and the rebuilt reviewer. Right: reported MCC when a leaked column is added.](figs/reviewer_accuracy_vs_leak.png)
+
+**What does the chart say.** On the left, the three systems score about the same when the data is clean or lightly damaged, and all of them drop when 30% of the labels are wrong. The first reviewer (orange) is lowest at 15% and 30% noise, because it deleted good rows. The rebuilt reviewer (blue) recovers most of that loss but does not beat the single pass (grey). On the right, a column that leaks the answer pushes the single pass to a perfect 1.00. The reviewers flag the column and report 0.65, which is the honest score. The point of the reviewer is the right panel, not the left.
 
 Our first reviewer made things worse. It deleted rows it thought were mislabeled, and with only about 240 training rows it threw away good data. We rebuilt it so it removes rows only if a leak-free cross-validation test shows that helps. That fixed most of the damage, but it still does not beat the single pass. On Amazon reviews all systems tie. On taxi tips the rebuilt reviewer scores lower on MCC, because it forces a more balanced model.
 
@@ -104,7 +132,7 @@ Our first reviewer made things worse. It deleted rows it thought were mislabeled
 - **Leaks:** with a fake leaked column added, the single pass and the plain graph scored a perfect MCC of 1.0. The reviewer flagged the column in 10 of 10 runs and reported the true 0.65.
 - **Natural leaks:** it missed a real one. In the taxi data, the payment type almost gives away the tip, since cash tips are not recorded. Keeping that column lifted every system from 0.21 to 0.91, and nothing caught it.
 
-The agent is not smarter. It is more careful. And its routing is rule-based: the language model only writes the plan and the summary.
+Its routing is rule-based: the language model only writes the plan and the summary.
 
 **A closer look at the label checks**
 
@@ -121,8 +149,8 @@ If you test an AI pipeline, a few habits would have saved us a rerun:
 3. **Plant faults and see who notices.** A pipeline that reports a perfect score on leaked data is the one to worry about.
 4. **Report the null result.** "No accuracy gain, but it catches broken data" is less exciting than a win, and much more useful.
 
-The limits are real. Heart disease used 10 random splits, but taxi and Amazon used only 3, on 5,000-row samples, and the leak we planted is easy to spot.
+The limits are real. Heart disease used 10 random splits, but taxi and Amazon used only 3, on 5,000-row samples, AutoGluon only had a 60 second budget per fit, and the leak we planted is easy to spot.
 
-Next we want to run AutoGluon on exactly the same splits and corruption, test more seeds on the taxi and Amazon data, let the language model choose the retry strategy instead of fixed rules, and look for a check that catches natural leaks like the payment type, not just planted ones.
+Next we want to test more seeds on the taxi and Amazon data, run AutoGluon through the leak test as well, let the language model choose the retry strategy instead of fixed rules, and look for a check that catches natural leaks like the payment type, not just planted ones.
 
 The code, the results and a step-by-step write-up are in the [project folder](https://github.com/Under-the-stars/umd_classes/tree/research/fair-benchmark/research/agentic_benchmark). If you have run a similar comparison, or can see a flaw in ours, we would like to hear about it in the comments.
