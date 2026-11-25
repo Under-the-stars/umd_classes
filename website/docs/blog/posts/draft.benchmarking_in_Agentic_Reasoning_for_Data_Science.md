@@ -10,7 +10,8 @@ categories:
   - AI Research
 draft: true
 ---
-**TL;DR:** A reviewer agent did not make our data science pipeline more accurate. It made it safer. It found every impossible value we planted and flagged a leaked column in 10 of 10 runs, where the other systems reported a perfect score of 1.0 that meant nothing. The honest score was 0.65. The agent is not smarter. It is more careful.
+
+**TL;DR:** A reviewer agent did not make our data science pipeline more accurate. It made it safer. It found every impossible value we planted. It flagged a leaked column in 10 of 10 runs, where the other systems, AutoGluon included, reported a perfect score of 1.0 that meant nothing. The honest score was 0.65. It also dropped a real leak in the taxi data that we had not planted. The agent is not smarter. It is more careful.
 
 <!-- more -->
 
@@ -28,7 +29,7 @@ The question: does an AI pipeline with a built-in quality checker give more reli
 
 We built the pipeline as a [LangGraph](https://www.langchain.com/langgraph) graph with five steps: plan, explore the data, train models, review, write a report. The review step is the interesting one. It checks the work and can send the graph back to an earlier step instead of moving on.
 
-We compared it with a single-pass version, with [AutoGluon](https://auto.gluon.ai), and with a model that predicts "yes" for everyone. AutoGluon ran with a 60 second limit and the medium quality preset. Every system got the same train/test split, the same corrupted training data and the same clean test set, on three datasets:
+We compared it with a single-pass version, with [AutoGluon](https://auto.gluon.ai), and with a model that predicts "yes" for everyone. AutoGluon ran with a 60 second limit and the medium quality preset. Every fit finished in under 31 seconds, and a 300 second limit gave identical scores. Every system got the same train/test split, the same corrupted training data and the same clean test set, on three datasets:
 
 - **Heart disease:** the [Cleveland data](https://archive.ics.uci.edu/dataset/45/heart+disease), 303 patients. Tiny and easy to overfit.
 - **NYC taxi tips:** a sample of [yellow cab trips](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page). Whether a ride was tipped.
@@ -88,7 +89,7 @@ By F1 they are nearly tied. By [MCC](https://en.wikipedia.org/wiki/Phi_coefficie
 
 ## What the fair test shows
 
-On accuracy, nobody clearly wins. Here are all three systems side by side, scored with MCC on the clean test set and averaged over random splits (10 for heart disease, 3 for taxi and Amazon). "LangGraph + reviewer" is our rebuilt multi-agent pipeline:
+On accuracy, nobody clearly wins. Here are all three systems side by side, scored with MCC on the clean test set and averaged over random splits (10 for heart disease, 5 or 6 for Amazon, 3 for taxi). "LangGraph + reviewer" is our rebuilt multi-agent pipeline:
 
 | Dataset | Wrong labels in training data | AutoGluon | Single pass | LangGraph + reviewer |
 |---|---|---|---|---|
@@ -96,10 +97,10 @@ On accuracy, nobody clearly wins. Here are all three systems side by side, score
 | Heart disease | 5% | 0.623 | 0.654 | 0.654 |
 | Heart disease | 15% | 0.605 | 0.651 | 0.628 |
 | Heart disease | 30% | 0.468 | 0.504 | 0.466 |
-| Amazon reviews | 0% | 0.585 | 0.587 | 0.587 |
-| Amazon reviews | 5% | 0.589 | 0.574 | 0.577 |
-| Amazon reviews | 15% | 0.581 | 0.545 | 0.553 |
-| Amazon reviews | 30% | 0.507 | 0.532 | 0.532 |
+| Amazon reviews | 0% | 0.590 | 0.591 | 0.591 |
+| Amazon reviews | 5% | 0.593 | 0.581 | 0.578 |
+| Amazon reviews | 15% | 0.573 | 0.549 | 0.550 |
+| Amazon reviews | 30% | 0.517 | 0.519 | 0.517 |
 | NYC taxi tips | 0% | 0.094 | 0.202 | 0.129 |
 | NYC taxi tips | 5% | 0.093 | 0.206 | 0.156 |
 | NYC taxi tips | 15% | 0.118 | 0.206 | 0.157 |
@@ -107,9 +108,10 @@ On accuracy, nobody clearly wins. Here are all three systems side by side, score
 
 **How to read the table.**
 
-- **Heart disease and Amazon reviews: a tie.** The three systems are within a few hundredths of each other. On heart disease the score moves by about 0.1 from one random split to the next, so gaps this small are noise. All three also fall as more labels go wrong, and the fall is steepest at 30%.
-- **NYC taxi tips: AutoGluon is lowest at every noise level.** The single pass is highest and LangGraph with the reviewer sits in between. Taxi is a hard task (every MCC is 0.2 or below), and we only ran 3 splits, so treat the size of the gap with care. The ordering is the same at every noise level, though.
-- **The reviewer costs a little on taxi.** Its retry step pushes the model toward a more balanced one. On clean data that raised balanced accuracy (0.569 against 0.527) but lowered MCC.
+- **Heart disease: a tie.** The three systems are within a few hundredths of each other at every noise level. The score moves by about 0.1 from one random split to the next, so gaps this small are noise. All three also fall as more labels go wrong, and the fall is steepest at 30%.
+- **Amazon reviews: also a tie.** The reviewer and the single pass score the same at every noise level. The only gap outside the noise is AutoGluon at 15% wrong labels, 0.024 higher, which is small.
+- **NYC taxi tips: AutoGluon is lowest at every noise level**, by 0.09 to 0.16 MCC, and that gap is outside the noise. Taxi is a hard task (every MCC is 0.2 or below) and we only ran 3 splits, so treat the size of the gap with care. The ordering is the same at every noise level, though.
+- **The reviewer costs a little on taxi.** Compared with the single pass it is lower on clean data (0.07 MCC), and within the noise at the other levels. Its retry step pushes the model toward a more balanced one. On clean data the single pass says "tipped" for almost every ride (recall 1.00, specificity 0.055), which is why its F1 matches the do-nothing model. The reviewer's model catches more of the untipped rides (specificity 0.353, recall 0.785). That raised balanced accuracy (0.569 against 0.527) but lowered MCC and F1.
 - **Nothing here says the multi-agent system is more accurate.** If you only wanted the best score, the single pass is as good or better everywhere.
 
 Here is the same comparison for heart disease, split by reviewer version:
@@ -122,17 +124,17 @@ Here is the same comparison for heart disease, split by reviewer version:
 
 ![Left: heart disease MCC by amount of label noise for the single pass, the first reviewer and the rebuilt reviewer. Right: reported MCC when a leaked column is added.](figs/reviewer_accuracy_vs_leak.png)
 
-**What does the chart say.** On the left, the three systems score about the same when the data is clean or lightly damaged, and all of them drop when 30% of the labels are wrong. The first reviewer (orange) is lowest at 15% and 30% noise, because it deleted good rows. The rebuilt reviewer (blue) recovers most of that loss but does not beat the single pass (grey). On the right, a column that leaks the answer pushes the single pass to a perfect 1.00. The reviewers flag the column and report 0.65, which is the honest score. The point of the reviewer is the right panel, not the left.
+**How to read the chart.** On the left, the three systems score about the same when the data is clean or lightly damaged, and all of them drop when 30% of the labels are wrong. The first reviewer (orange) is lowest at 15% and 30% noise, because it deleted good rows. The rebuilt reviewer (blue) recovers most of that loss but does not beat the single pass (grey). On the right, a column that leaks the answer pushes the single pass to a perfect 1.00. AutoGluon also scored 1.00 in all 10 splits (not drawn). The reviewers flag the column and report 0.65, which is the honest score. The point of the reviewer is the right panel, not the left.
 
 Our first reviewer made things worse. It deleted rows it thought were mislabeled, and with only about 240 training rows it threw away good data. We rebuilt it so it removes rows only if a leak-free cross-validation test shows that helps. That fixed most of the damage, but it still does not beat the single pass. On Amazon reviews all systems tie. On taxi tips the rebuilt reviewer scores lower on MCC, because it forces a more balanced model.
 
 **Where the reviewer earns its place**
 
 - **Impossible values:** it found all of them, on all three datasets.
-- **Leaks:** with a fake leaked column added, the single pass and the plain graph scored a perfect MCC of 1.0. The reviewer flagged the column in 10 of 10 runs and reported the true 0.65.
-- **Natural leaks:** it missed a real one. In the taxi data, the payment type almost gives away the tip, since cash tips are not recorded. Keeping that column lifted every system from 0.21 to 0.91, and nothing caught it.
+- **Planted leaks:** with a fake leaked column added, the single pass, the plain graph and AutoGluon scored a perfect MCC of 1.0. The reviewer flagged the column in 10 of 10 runs and reported the true 0.65.
+- **A natural leak:** it caught a real one. In the taxi data, the payment type almost gives away the tip, since cash tips are not recorded. With that column kept, the single pass, the plain graph, the first reviewer and AutoGluon all scored an MCC of about 0.91. The rebuilt reviewer dropped the column in 3 of 3 runs and reported about 0.09, close to the 0.13 it scores without the column. That is three runs on one dataset, so treat it as promising, not proven.
 
-Its routing is rule-based: the language model only writes the plan and the summary.
+By default its routing is rule-based: the language model only writes the plan and the summary. We also let a small local model (llama3.2) pick the retry strategy instead of the fixed order. Over 12 taxi runs it ended up with exactly the same sequence as the rules every time, so it changed no scores. We did not record whether it gave its own answer or fell back to the rules, so we cannot say it made a real choice.
 
 **A closer look at the label checks**
 
@@ -149,8 +151,8 @@ If you test an AI pipeline, a few habits would have saved us a rerun:
 3. **Plant faults and see who notices.** A pipeline that reports a perfect score on leaked data is the one to worry about.
 4. **Report the null result.** "No accuracy gain, but it catches broken data" is less exciting than a win, and much more useful.
 
-The limits are real. Heart disease used 10 random splits, but taxi and Amazon used only 3, on 5,000-row samples, AutoGluon only had a 60 second budget per fit, and the leak we planted is easy to spot.
+The limits are real. Heart disease used 10 random splits, Amazon 5 or 6 and taxi only 3, on 5,000-row samples. AutoGluon used only the medium quality preset. The leak we planted is easy to spot, and the natural leak check was tried on one dataset.
 
-Next we want to test more seeds on the taxi and Amazon data, run AutoGluon through the leak test as well, let the language model choose the retry strategy instead of fixed rules, and look for a check that catches natural leaks like the payment type, not just planted ones.
+Next we want to test more splits on the taxi data, try AutoGluon's best quality preset, record the language model's raw answers when it picks a retry strategy, and test the natural leak check on more datasets.
 
 The code, the results and a step-by-step write-up are in the [project folder](https://github.com/Under-the-stars/umd_classes/tree/research/fair-benchmark/research/agentic_benchmark). If you have run a similar comparison, or can see a flaw in ours, we would like to hear about it in the comments.
